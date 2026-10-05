@@ -536,6 +536,7 @@
                     <input type="range" id="observe-time" min="0" max="24" value="18" step="0.5">
                 </div>
                 <div class="btn-group">
+                    <button class="btn btn-primary" id="play-btn" onclick="togglePlay()">▶ 播放一整月</button>
                     <button class="btn btn-primary" onclick="setPhase(0)">🌑 新月</button>
                     <button class="btn btn-primary" onclick="setPhase(90)">🌓 上弦</button>
                     <button class="btn btn-primary" onclick="setPhase(180)">🌕 满月</button>
@@ -821,6 +822,8 @@
         // 状态变量
         let moonAngle = 0;
         let observeTime = 18;
+        let playState = 'idle'; // 'idle' | 'playing' | 'paused' | 'ended'
+        let playSpeed = 2.0; // degrees per frame
 
         // 更新月球位置
         function updateMoon() {
@@ -910,7 +913,36 @@
         function setPhase(angle) {
             moonAngle = angle;
             document.getElementById('moon-angle').value = angle;
+            playState = 'idle'; // 手动设置月相后停止播放
+            updatePlayButton();
             updateMoon();
+        }
+
+        function togglePlay() {
+            if (playState === 'ended') {
+                // 已播完，重新播放：进度归零并开始
+                moonAngle = 0;
+                document.getElementById('moon-angle').value = 0;
+                playState = 'playing';
+            } else if (playState === 'playing') {
+                // 播放中，暂停
+                playState = 'paused';
+            } else {
+                // 未播放或已暂停，继续播放
+                playState = 'playing';
+            }
+            updatePlayButton();
+        }
+
+        function updatePlayButton() {
+            const btn = document.getElementById('play-btn');
+            if (playState === 'ended') {
+                btn.textContent = '🔁 重新播放';
+            } else if (playState === 'playing') {
+                btn.textContent = '⏸ 暂停';
+            } else {
+                btn.textContent = '▶ 播放一整月';
+            }
         }
 
         function resetScene() {
@@ -918,6 +950,8 @@
             observeTime = 18;
             document.getElementById('moon-angle').value = 0;
             document.getElementById('observe-time').value = 18;
+            playState = 'idle';
+            updatePlayButton();
             resetView();
             updateMoon();
         }
@@ -998,6 +1032,18 @@
         // 动画循环
         function animate() {
             requestAnimationFrame(animate);
+
+            // 播放控制：自动推进月相
+            if (playState === 'playing') {
+                moonAngle += playSpeed;
+                if (moonAngle >= 360) {
+                    moonAngle = 360;
+                    playState = 'ended';
+                    updatePlayButton();
+                }
+                document.getElementById('moon-angle').value = moonAngle;
+                updateMoon();
+            }
 
             // 地球自转
             earth.rotation.y += 0.001;
