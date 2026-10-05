@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>月相变化与"上上西西下下东东" - Moon Phases Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        :root {
+            --primary-gradient: linear-gradient(135deg, #1E40AF 0%, #3B82F6 50%, #60A5FA 100%);
+            --bg-gradient: linear-gradient(180deg, #0F172A 0%, #1E293B 50%, #334155 100%);
+            --glass-bg: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.15);
+            --text-primary: #F8FAFC;
+            --text-secondary: #CBD5E1;
+            --accent-cyan: #22D3EE;
+            --accent-amber: #FBBF24;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+
+        #navbar {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(59, 130, 246, 0.3);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        #navbar h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-buttons button {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: var(--text-primary);
+            padding: 0.5rem 1rem;
+            margin-left: 0.5rem;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .nav-buttons button:hover {
+            background: rgba(59, 130, 246, 0.3);
+            transform: translateY(-2px);
+        }
+
+        #main-container {
+            display: flex;
+            height: calc(100vh - 80px);
+        }
+
+        #sidebar {
+            width: 30%;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(20px);
+            padding: 2rem;
+            overflow-y: auto;
+            border-right: 1px solid rgba(59, 130, 246, 0.2);
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        #sidebar.collapsed {
+            width: 0;
+            padding: 0;
+            border-right: none;
+            overflow: hidden;
+        }
+
+        #sidebar-collapse-btn {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        #sidebar-collapse-btn:hover {
+            color: #fff;
+        }
+
+        #sidebar-toggle-btn {
+            position: absolute;
+            left: 1rem;
+            top: 1rem;
+            z-index: 10;
+            height: 42px;
+            padding: 0 1rem;
+            background: linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%);
+            border: none;
+            border-radius: 999px;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        #sidebar-toggle-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(59, 130, 246, 0.6);
+        }
+
+        #sidebar-toggle-btn.show {
+            display: flex;
+        }
+
+        .section {
+            margin-bottom: 2rem;
+        }
+
+        .section h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--accent-cyan);
+        }
+
+        .objective-item {
+            display: flex;
+            align-items: start;
+            margin-bottom: 0.75rem;
+        }
+
+        .objective-item input {
+            margin-right: 0.5rem;
+            margin-top: 0.25rem;
+        }
+
+        .formula-box {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        #canvas-area {
+            width: 70%;
+            flex: 1;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #canvas-container {
+            width: 100%;
+            flex: 1;
+            min-height: 0;
+            position: relative;
+        }
+
+        #control-panel {
+            flex-shrink: 0;
+            margin: 0 auto 1rem;
+            position: relative;
+            background: rgba(22, 78, 99, 0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 20px;
+            padding: 1.5rem 2rem;
+            width: 80%;
+            max-width: 600px;
+            transition: all 0.3s ease;
+        }
+
+        #control-panel.collapsed {
+            display: none;
+        }
+
+        #control-collapse-btn {
+            position: absolute;
+            top: 0.6rem;
+            right: 0.9rem;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1rem;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        #control-collapse-btn:hover {
+            color: #fff;
+        }
+
+        #control-toggle-btn {
+            position: absolute;
+            left: 50%;
+            bottom: 1rem;
+            transform: translateX(-50%);
+            height: 48px;
+            padding: 0 1.25rem;
+            background: linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%);
+            border: none;
+            border-radius: 999px;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        #control-toggle-btn:hover {
+            transform: translateX(-50%) translateY(-2px);
+            box-shadow: 0 6px 24px rgba(59, 130, 246, 0.6);
+        }
+
+        #control-toggle-btn.show {
+            display: flex;
+        }
+
+        .control-row {
+            margin-bottom: 1rem;
+        }
+
+        .control-row label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .control-row input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        .control-row input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(135deg, #60A5FA 0%, #93C5FD 100%);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
+        }
+
+        .value-display {
+            display: inline-block;
+            background: rgba(59, 130, 246, 0.2);
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-weight: 600;
+            color: var(--accent-cyan);
+            margin-left: 0.5rem;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        #quiz-panel {
+            position: absolute;
+            right: 2rem;
+            bottom: 2rem;
+            width: 360px;
+            max-height: 380px;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 20px;
+            padding: 1.5rem;
+            overflow-y: auto;
+            transition: all 0.3s ease;
+        }
+
+        #quiz-panel.hidden {
+            display: none;
+        }
+
+        #quiz-toggle-btn {
+            position: absolute;
+            right: 2rem;
+            bottom: 2rem;
+            height: 48px;
+            padding: 0 1.25rem;
+            background: linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%);
+            border: none;
+            border-radius: 999px;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #fff;
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        #quiz-toggle-btn:hover {
+            transform: scale(1.1);
+        }
+
+        #quiz-toggle-btn.show {
+            display: flex;
+        }
+
+        .quiz-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(239, 68, 68, 0.2);
+            border: none;
+            color: #EF4444;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2rem;
+            line-height: 1;
+        }
+
+        .quiz-item {
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .quiz-item:last-child {
+            border-bottom: none;
+        }
+
+        .quiz-question {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .quiz-options {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .quiz-option {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .quiz-option:hover {
+            background: rgba(59, 130, 246, 0.2);
+        }
+
+        #phase-label {
+            position: absolute;
+            top: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(59, 130, 246, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            border-radius: 999px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-align: center;
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .footer-note {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <div id="navbar">
+        <h1>🌙 月相变化与"上上西西下下东东" / Moon Phases</h1>
+        <div class="nav-buttons">
+            <button onclick="resetScene()">🔄 重置</button>
+            <button onclick="randomExperiment()">🎲 随机月相</button>
+            <button onclick="toggleFullscreen()">⛶ 全屏</button>
+        </div>
+    </div>
+
+    <div id="main-container">
+        <div id="sidebar">
+            <button id="sidebar-collapse-btn" onclick="toggleSidebar()" title="收起知识栏">❮ 收起</button>
+            <div class="section">
+                <h2>📚 学习目标</h2>
+                <div class="objective-item">
+                    <input type="checkbox" id="obj1">
+                    <label for="obj1">理解月相变化的成因（日-地-月位置关系）</label>
+                </div>
+                <div class="objective-item">
+                    <input type="checkbox" id="obj2">
+                    <label for="obj2">掌握"上上西西下下东东"口诀的含义</label>
+                </div>
+                <div class="objective-item">
+                    <input type="checkbox" id="obj3">
+                    <label for="obj3">识别每个农历月的主要月相（新月、上弦、满月、下弦）</label>
+                </div>
+                <div class="objective-item">
+                    <input type="checkbox" id="obj4">
+                    <label for="obj4">理解月相与观测时间、方位的关系</label>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>📐 核心概念</h2>
+                <div class="formula-box">
+                    <div class="katex-formula">月相周期（朔望月）= 29.53 天</div>
+                    <div class="katex-formula">月球公转周期（恒星月）= 27.32 天</div>
+                </div>
+                <div class="formula-box">
+                    <div class="katex-formula" style="font-weight: 600; color: #FBBF24;">
+                        上上西西：上弦月，上半夜出现，在西边<br>
+                        下下东东：下弦月，下半夜出现，在东边
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>💡 原理解释</h2>
+                <p style="line-height: 1.6; color: var(--text-secondary); margin-bottom: 1rem;">
+                    月相的变化是由于<strong style="color: var(--accent-cyan);">月球绕地球公转时，太阳光照射月球的角度不同</strong>，我们从地球上看到被照亮的部分也不同。
+                </p>
+                <p style="line-height: 1.6; color: var(--text-secondary); margin-bottom: 1rem;">
+                    想象你拿着一个球，站在路灯下转圈——球的亮面会随着你的位置变化。月球就像这个球，太阳是路灯，而你站在地球上观察。
+                </p>
+                <p style="line-height: 1.6; color: var(--text-secondary); margin-bottom: 1rem;">
+                    <strong style="color: var(--accent-amber);">"上上西西下下东东"</strong>是高中地理的经典口诀：
+                </p>
+                <ul style="line-height: 1.8; color: var(--text-secondary); margin-left: 1.5rem;">
+                    <li><strong>上弦月（农历初七八）</strong>：傍晚从东方升起，上半夜可见，午夜在西方落下。月面右半边亮（像字母D）。</li>
+                    <li><strong>下弦月（农历廿二三）</strong>：午夜从东方升起，下半夜可见，清晨在西方落下。月面左半边亮（像字母C）。</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h2>🌍 为什么重要</h2>
+                <p style="line-height: 1.6; color: var(--text-secondary);">
+                    • 古代农历编制的基础（一个月 ≈ 一个朔望月）<br>
+                    • 潮汐预测（满月和新月时潮差最大）<br>
+                    • 天文导航与时间判断<br>
+                    • 郑州位于北纬34°，月相观测条件优越
+                </p>
+            </div>
+
+            <div class="section">
+                <h2>🔗 扩展阅读</h2>
+                <p style="line-height: 1.6; color: var(--text-secondary); font-size: 0.875rem;">
+                    <a href="https://zh.wikipedia.org/wiki/月相" style="color: var(--accent-cyan);">维基百科：月相</a><br>
+                    <a href="https://www.timeanddate.com/moon/phases/" style="color: var(--accent-cyan);">Time and Date: Moon Phases</a>
+                </p>
+            </div>
+        </div>
+
+        <div id="canvas-area">
+            <button id="sidebar-toggle-btn" onclick="toggleSidebar()">📚 知识栏</button>
+            <div id="canvas-container"></div>
+            <div id="phase-label">新月 New Moon</div>
+
+            <div id="control-panel">
+                <button id="control-collapse-btn" onclick="toggleControls()" title="收起控制面板">⌄ 收起</button>
+                <div class="control-row">
+                    <label>🌙 月球位置（农历日期）<span class="value-display" id="day-value">初一（0°）</span></label>
+                    <input type="range" id="moon-angle" min="0" max="360" value="0" step="1">
+                </div>
+                <div class="control-row">
+                    <label>⏰ 观测时间<span class="value-display" id="time-value">18:00（傍晚）</span></label>
+                    <input type="range" id="observe-time" min="0" max="24" value="18" step="0.5">
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="setPhase(0)">🌑 新月</button>
+                    <button class="btn btn-primary" onclick="setPhase(90)">🌓 上弦</button>
+                    <button class="btn btn-primary" onclick="setPhase(180)">🌕 满月</button>
+                    <button class="btn btn-primary" onclick="setPhase(270)">🌗 下弦</button>
+                </div>
+            </div>
+
+            <div id="quiz-panel" class="hidden">
+                <button class="quiz-close" onclick="toggleQuiz()">✕</button>
+                <h3 style="margin-bottom: 1rem; color: var(--accent-cyan);">🧪 小测验</h3>
+
+                <div class="quiz-item">
+                    <div class="quiz-question">1. 农历初七八看到的是什么月相？</div>
+                    <div class="quiz-options">
+                        <div class="quiz-option">A. 新月</div>
+                        <div class="quiz-option" style="background: rgba(34, 197, 94, 0.2);">B. 上弦月 ✓</div>
+                        <div class="quiz-option">C. 满月</div>
+                    </div>
+                </div>
+
+                <div class="quiz-item">
+                    <div class="quiz-question">2. "上上西西"的意思是？</div>
+                    <div class="quiz-options">
+                        <div class="quiz-option" style="background: rgba(34, 197, 94, 0.2);">A. 上弦月在上半夜出现在西边 ✓</div>
+                        <div class="quiz-option">B. 月亮从西边升起</div>
+                        <div class="quiz-option">C. 满月在西边最亮</div>
+                    </div>
+                </div>
+
+                <div class="quiz-item">
+                    <div class="quiz-question">3. 月相变化的周期是？</div>
+                    <div class="quiz-options">
+                        <div class="quiz-option">A. 27.32天（恒星月）</div>
+                        <div class="quiz-option" style="background: rgba(34, 197, 94, 0.2);">B. 29.53天（朔望月）✓</div>
+                        <div class="quiz-option">C. 30天</div>
+                    </div>
+                </div>
+            </div>
+
+            <button id="quiz-toggle-btn" class="show" onclick="toggleQuiz()">📝 小测验</button>
+            <button id="control-toggle-btn" onclick="toggleControls()">🎛️ 控制面板</button>
+        </div>
+    </div>
+
+    <script>
+        // OrbitControls 内联简化版
+        class OrbitControls {
+            constructor(camera, domElement) {
+                this.camera = camera;
+                this.domElement = domElement;
+                this.enabled = true;
+                this.enableDamping = true;
+                this.dampingFactor = 0.05;
+                this.enableZoom = true;
+                this.minDistance = 5;
+                this.maxDistance = 50;
+
+                this.rotateSpeed = 0.5;
+                this.zoomSpeed = 1.0;
+
+                this.spherical = { radius: 20, theta: Math.PI / 4, phi: Math.PI / 3 };
+                this.target = new THREE.Vector3();
+
+                this.rotateStart = new THREE.Vector2();
+                this.rotateEnd = new THREE.Vector2();
+                this.rotateDelta = new THREE.Vector2();
+
+                this.isRotating = false;
+
+                this.domElement.addEventListener('mousedown', this.onMouseDown.bind(this));
+                this.domElement.addEventListener('mousemove', this.onMouseMove.bind(this));
+                this.domElement.addEventListener('mouseup', this.onMouseUp.bind(this));
+                this.domElement.addEventListener('wheel', this.onWheel.bind(this));
+                this.domElement.addEventListener('touchstart', this.onTouchStart.bind(this));
+                this.domElement.addEventListener('touchmove', this.onTouchMove.bind(this));
+                this.domElement.addEventListener('touchend', this.onTouchEnd.bind(this));
+            }
+
+            onMouseDown(e) {
+                if (!this.enabled) return;
+                this.isRotating = true;
+                this.rotateStart.set(e.clientX, e.clientY);
+            }
+
+            onMouseMove(e) {
+                if (!this.enabled || !this.isRotating) return;
+                this.rotateEnd.set(e.clientX, e.clientY);
+                this.rotateDelta.subVectors(this.rotateEnd, this.rotateStart).multiplyScalar(this.rotateSpeed);
+
+                this.spherical.theta -= 2 * Math.PI * this.rotateDelta.x / this.domElement.clientHeight;
+                this.spherical.phi -= 2 * Math.PI * this.rotateDelta.y / this.domElement.clientHeight;
+                this.spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, this.spherical.phi));
+
+                this.rotateStart.copy(this.rotateEnd);
+            }
+
+            onMouseUp(e) {
+                this.isRotating = false;
+            }
+
+            onWheel(e) {
+                if (!this.enabled || !this.enableZoom) return;
+                e.preventDefault();
+                this.spherical.radius += e.deltaY * 0.01 * this.zoomSpeed;
+                this.spherical.radius = Math.max(this.minDistance, Math.min(this.maxDistance, this.spherical.radius));
+            }
+
+            onTouchStart(e) {
+                if (!this.enabled) return;
+                if (e.touches.length === 1) {
+                    this.isRotating = true;
+                    this.rotateStart.set(e.touches[0].clientX, e.touches[0].clientY);
+                }
+            }
+
+            onTouchMove(e) {
+                if (!this.enabled || !this.isRotating) return;
+                if (e.touches.length === 1) {
+                    this.rotateEnd.set(e.touches[0].clientX, e.touches[0].clientY);
+                    this.rotateDelta.subVectors(this.rotateEnd, this.rotateStart).multiplyScalar(this.rotateSpeed);
+
+                    this.spherical.theta -= 2 * Math.PI * this.rotateDelta.x / this.domElement.clientHeight;
+                    this.spherical.phi -= 2 * Math.PI * this.rotateDelta.y / this.domElement.clientHeight;
+                    this.spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, this.spherical.phi));
+
+                    this.rotateStart.copy(this.rotateEnd);
+                }
+            }
+
+            onTouchEnd(e) {
+                this.isRotating = false;
+            }
+
+            update() {
+                if (!this.enabled) return false;
+
+                const x = this.spherical.radius * Math.sin(this.spherical.phi) * Math.sin(this.spherical.theta);
+                const y = this.spherical.radius * Math.cos(this.spherical.phi);
+                const z = this.spherical.radius * Math.sin(this.spherical.phi) * Math.cos(this.spherical.theta);
+
+                this.camera.position.set(x, y, z);
+                this.camera.lookAt(this.target);
+
+                return true;
+            }
+        }
+
+        // Three.js 场景初始化
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0f172a);
+
+        const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(15, 10, 15);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.minDistance = 10;
+        controls.maxDistance = 40;
+
+        // 灯光
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        sunLight.position.set(-20, 0, 0);
+        sunLight.castShadow = true;
+        scene.add(sunLight);
+
+        // 太阳（光源位置标记）
+        const sunGeometry = new THREE.SphereGeometry(1.5, 32, 32);
+        const sunMaterial = new THREE.MeshBasicMaterial({
+            color: 0xfbbf24,
+            emissive: 0xfbbf24,
+            emissiveIntensity: 1
+        });
+        const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+        sun.position.set(-20, 0, 0);
+        scene.add(sun);
+
+        // 太阳光晕
+        const glowGeometry = new THREE.SphereGeometry(2, 32, 32);
+        const glowMaterial = new THREE.MeshBasicMaterial({
+            color: 0xfbbf24,
+            transparent: true,
+            opacity: 0.3
+        });
+        const sunGlow = new THREE.Mesh(glowGeometry, glowMaterial);
+        sunGlow.position.copy(sun.position);
+        scene.add(sunGlow);
+
+        // 地球
+        const earthGeometry = new THREE.SphereGeometry(2, 64, 64);
+        const earthMaterial = new THREE.MeshStandardMaterial({
+            color: 0x3b82f6,
+            roughness: 0.7,
+            metalness: 0.3
+        });
+        const earth = new THREE.Mesh(earthGeometry, earthMaterial);
+        earth.castShadow = true;
+        earth.receiveShadow = true;
+        scene.add(earth);
+
+        // 地球赤道线
+        const equatorGeometry = new THREE.TorusGeometry(2.1, 0.02, 16, 100);
+        const equatorMaterial = new THREE.MeshBasicMaterial({ color: 0x22d3ee });
+        const equator = new THREE.Mesh(equatorGeometry, equatorMaterial);
+        equator.rotation.x = Math.PI / 2;
+        scene.add(equator);
+
+        // 郑州标记（北纬34°）
+        const zhengzhouMarker = new THREE.Mesh(
+            new THREE.SphereGeometry(0.15, 16, 16),
+            new THREE.MeshBasicMaterial({ color: 0xef4444 })
+        );
+        const zhengzhouLat = 34 * Math.PI / 180;
+        zhengzhouMarker.position.set(
+            2.1 * Math.cos(zhengzhouLat),
+            2.1 * Math.sin(zhengzhouLat),
+            0
+        );
+        scene.add(zhengzhouMarker);
+
+        // 月球轨道
+        const orbitGeometry = new THREE.TorusGeometry(8, 0.05, 16, 100);
+        const orbitMaterial = new THREE.MeshBasicMaterial({
+            color: 0x60a5fa,
+            transparent: true,
+            opacity: 0.4
+        });
+        const orbit = new THREE.Mesh(orbitGeometry, orbitMaterial);
+        orbit.rotation.x = Math.PI / 2;
+        scene.add(orbit);
+
+        // 月球
+        const moonGeometry = new THREE.SphereGeometry(0.8, 64, 64);
+        const moonMaterial = new THREE.MeshStandardMaterial({
+            color: 0xe5e7eb,
+            roughness: 0.9,
+            metalness: 0.1
+        });
+        const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+        moon.castShadow = true;
+        moon.receiveShadow = true;
+        scene.add(moon);
+
+        // 月球到地球的连线
+        const lineMaterial = new THREE.LineBasicMaterial({
+            color: 0x93c5fd,
+            transparent: true,
+            opacity: 0.3
+        });
+        const lineGeometry = new THREE.BufferGeometry();
+        const linePositions = new Float32Array(6);
+        lineGeometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+        const connectionLine = new THREE.Line(lineGeometry, lineMaterial);
+        scene.add(connectionLine);
+
+        // 观测者视线方向箭头
+        const observerArrow = new THREE.ArrowHelper(
+            new THREE.Vector3(0, 0, -1),
+            zhengzhouMarker.position.clone(),
+            3,
+            0x22d3ee,
+            0.5,
+            0.3
+        );
+        scene.add(observerArrow);
+
+        // 添加网格地面（参考）
+        const gridHelper = new THREE.GridHelper(40, 40, 0x60a5fa, 0x1e40af);
+        gridHelper.material.transparent = true;
+        gridHelper.material.opacity = 0.2;
+        scene.add(gridHelper);
+
+        // 状态变量
+        let moonAngle = 0;
+        let observeTime = 18;
+
+        // 更新月球位置
+        function updateMoon() {
+            const angleRad = (moonAngle * Math.PI) / 180;
+            const distance = 8;
+
+            moon.position.x = Math.cos(angleRad) * distance;
+            moon.position.z = Math.sin(angleRad) * distance;
+            moon.position.y = 0;
+
+            // 更新连线
+            const positions = connectionLine.geometry.attributes.position.array;
+            positions[0] = earth.position.x;
+            positions[1] = earth.position.y;
+            positions[2] = earth.position.z;
+            positions[3] = moon.position.x;
+            positions[4] = moon.position.y;
+            positions[5] = moon.position.z;
+            connectionLine.geometry.attributes.position.needsUpdate = true;
+
+            // 更新观测者视线方向（模拟地球自转）
+            const timeAngle = (observeTime / 24) * 2 * Math.PI;
+            const viewDir = new THREE.Vector3(
+                Math.cos(timeAngle),
+                0,
+                Math.sin(timeAngle)
+            );
+            observerArrow.setDirection(viewDir);
+
+            // 计算月相
+            updatePhaseLabel();
+        }
+
+        // 更新月相标签
+        function updatePhaseLabel() {
+            const label = document.getElementById('phase-label');
+            const dayValue = document.getElementById('day-value');
+
+            // 计算农历日期（粗略）
+            const lunarDay = Math.round((moonAngle / 360) * 29.53);
+            let phaseName = '';
+            let phaseNameEn = '';
+
+            if (moonAngle < 45 || moonAngle >= 315) {
+                phaseName = '新月';
+                phaseNameEn = 'New Moon';
+            } else if (moonAngle >= 45 && moonAngle < 135) {
+                phaseName = '上弦月';
+                phaseNameEn = 'First Quarter';
+            } else if (moonAngle >= 135 && moonAngle < 225) {
+                phaseName = '满月';
+                phaseNameEn = 'Full Moon';
+            } else {
+                phaseName = '下弦月';
+                phaseNameEn = 'Last Quarter';
+            }
+
+            label.textContent = `${phaseName} ${phaseNameEn}`;
+
+            // 显示农历日期
+            const lunarNames = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
+                              '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十',
+                              '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'];
+            dayValue.textContent = `${lunarNames[lunarDay] || '初一'}（${moonAngle}°）`;
+        }
+
+        // 控制面板事件
+        document.getElementById('moon-angle').addEventListener('input', (e) => {
+            moonAngle = parseFloat(e.target.value);
+            updateMoon();
+        });
+
+        document.getElementById('observe-time').addEventListener('input', (e) => {
+            observeTime = parseFloat(e.target.value);
+            const timeValue = document.getElementById('time-value');
+            const hour = Math.floor(observeTime);
+            const minute = Math.round((observeTime - hour) * 60);
+            let period = '';
+            if (hour >= 6 && hour < 12) period = '（上午）';
+            else if (hour >= 12 && hour < 18) period = '（下午）';
+            else if (hour >= 18 && hour < 24) period = '（晚上）';
+            else period = '（深夜）';
+            timeValue.textContent = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}${period}`;
+            updateMoon();
+        });
+
+        function setPhase(angle) {
+            moonAngle = angle;
+            document.getElementById('moon-angle').value = angle;
+            updateMoon();
+        }
+
+        function resetScene() {
+            moonAngle = 0;
+            observeTime = 18;
+            document.getElementById('moon-angle').value = 0;
+            document.getElementById('observe-time').value = 18;
+            resetView();
+            updateMoon();
+        }
+
+        // 视图复位：恢复相机到初始视角与缩放距离（100% 合适比例），并按当前容器尺寸重新适配渲染器
+        function resetView() {
+            document.body.style.zoom = '100%';
+            controls.spherical = { radius: 20, theta: Math.PI / 4, phi: Math.PI / 3 };
+            controls.target.set(0, 0, 0);
+            controls.update();
+            resizeRenderer();
+        }
+
+        function randomExperiment() {
+            moonAngle = Math.random() * 360;
+            observeTime = Math.random() * 24;
+            document.getElementById('moon-angle').value = moonAngle;
+            document.getElementById('observe-time').value = observeTime;
+            updateMoon();
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        function toggleQuiz() {
+            const panel = document.getElementById('quiz-panel');
+            const btn = document.getElementById('quiz-toggle-btn');
+
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                btn.classList.remove('show');
+            } else {
+                panel.classList.add('hidden');
+                btn.classList.add('show');
+            }
+        }
+
+        function toggleControls() {
+            const panel = document.getElementById('control-panel');
+            const btn = document.getElementById('control-toggle-btn');
+            const collapseBtn = document.getElementById('control-collapse-btn');
+            if (panel.classList.contains('collapsed')) {
+                panel.classList.remove('collapsed');
+                btn.classList.remove('show');
+                collapseBtn.textContent = '⌄ 收起';
+            } else {
+                panel.classList.add('collapsed');
+                btn.classList.add('show');
+                collapseBtn.textContent = '⌃ 展开';
+            }
+            resizeRenderer();
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const btn = document.getElementById('sidebar-toggle-btn');
+            if (sidebar.classList.contains('collapsed')) {
+                sidebar.classList.remove('collapsed');
+                btn.classList.remove('show');
+            } else {
+                sidebar.classList.add('collapsed');
+                btn.classList.add('show');
+            }
+            setTimeout(resizeRenderer, 320);
+        }
+
+        function resizeRenderer() {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 地球自转
+            earth.rotation.y += 0.001;
+
+            // 太阳光晕脉动
+            const scale = 1 + Math.sin(Date.now() * 0.002) * 0.1;
+            sunGlow.scale.set(scale, scale, scale);
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // 响应式
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        // 初始化
+        updateMoon();
+        animate();
+
+        // KaTeX 渲染
+        renderMathInElement(document.body, {
+            delimiters: [
+                {left: "$$", right: "$$", display: true},
+                {left: "$", right: "$", display: false}
+            ]
+        });
+    </script>
+
+    <div class="footer-note">
+        🌙 观察月相，理解自然规律。从郑州仰望星空，你看到的不仅是月亮的圆缺，更是天体运行的永恒之美。<br>
+        由 FlyAIBox 互动课件大师为你生成 ❤️
+    </div>
+</body>
+</html>
